@@ -15,3 +15,6 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/users/me', [AuthController::class, 'profile']);
     Route::put('/users/me', [AuthController::class, 'updateProfile']);
 });
+
+// Email verification route
+Route::get('/verify-email/{token}', [AuthController::class, 'verifyEmail']);

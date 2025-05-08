@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Jobs\SendAuthNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -24,6 +26,9 @@ class AuthController extends Controller
                 'email' => $validated['email'],
                 'password' => bcrypt($validated['password'])
             ]);
+
+            // Kirim notifikasi registrasi
+            SendAuthNotification::dispatch($user, 'register');
 
             $token = JWTAuth::fromUser($user);
 
@@ -46,6 +51,38 @@ class AuthController extends Controller
         }
     }
 
+    public function verifyEmail($token)
+    {
+        try {
+            $user = User::where('email_verification_token', $token)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'code' => 404,
+                    'message' => 'Invalid verification token'
+                ], 404);
+            }
+
+            $user->email_verified_at = now();
+            $user->email_verification_token = null;
+            $user->save();
+
+            return response()->json([
+                'status' => 'success',
+                'code' => 200,
+                'message' => 'Email verified successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'code' => 500,
+                'message' => 'Email verification failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function login(Request $request)
     {
         $credentials = $request->only('email', 'password');
@@ -57,6 +94,11 @@ class AuthController extends Controller
                 'message' => 'Unauthorized'
             ], 401);
         }
+
+        $user = auth('api')->user();
+        
+        // Kirim notifikasi login
+        SendAuthNotification::dispatch($user, 'login');
 
         return response()->json([
             'status' => 'success',
