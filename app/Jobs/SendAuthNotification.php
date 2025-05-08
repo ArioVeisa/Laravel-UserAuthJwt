@@ -32,7 +32,7 @@ class SendAuthNotification implements ShouldQueue
     public function handle(): void
     {
         try {
-            Log::info('Mengirim notifikasi ' . $this->type . ' ke: ' . $this->user->email);
+            Log::info("Mengirim notifikasi {$this->type} untuk user: " . $this->user->email);
             
             $subject = $this->type === 'register' ? 'Selamat Datang di OrderIt!' : 'Login Berhasil di OrderIt';
             $template = $this->type === 'register' ? 'emails.welcome' : 'emails.login-notification';
@@ -46,11 +46,18 @@ class SendAuthNotification implements ShouldQueue
                        ->subject($subject);
             });
             
-            Log::info('Notifikasi berhasil dikirim ke: ' . $this->user->email);
+            Log::info("Notifikasi {$this->type} berhasil dikirim ke: " . $this->user->email);
         } catch (\Exception $e) {
-            Log::error('Gagal mengirim notifikasi: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error("Error mengirim notifikasi: " . $e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error("Job gagal: " . $exception->getMessage());
     }
 } 

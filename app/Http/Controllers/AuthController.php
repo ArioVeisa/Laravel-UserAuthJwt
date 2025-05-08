@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -22,30 +23,25 @@ class AuthController extends Controller
             ]);
 
             $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'password' => bcrypt($validated['password'])
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
             ]);
 
-            // Kirim notifikasi registrasi
+            // Dispatch job ke queue
             SendAuthNotification::dispatch($user, 'register');
 
             $token = JWTAuth::fromUser($user);
 
             return response()->json([
-                'status' => 'success',
-                'code' => 201,
-                'message' => 'User registered successfully',
-                'data' => [
-                    'user' => $user,
-                    'token' => $token
-                ]
+                'message' => 'Registrasi berhasil',
+                'user' => $user,
+                'token' => $token
             ], 201);
         } catch (\Exception $e) {
+            Log::error('Error dalam registrasi: ' . $e->getMessage());
             return response()->json([
-                'status' => 'error',
-                'code' => 500,
-                'message' => 'Registration failed',
+                'message' => 'Terjadi kesalahan dalam registrasi',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -85,27 +81,38 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $credentials = $request->only('email', 'password');
+        try {
+            $request->validate([
+                'email' => 'required|string|email',
+                'password' => 'required|string',
+            ]);
 
-        if (!$token = auth('api')->attempt($credentials)) {
+            $credentials = $request->only('email', 'password');
+
+            if (!$token = auth('api')->attempt($credentials)) {
+                return response()->json([
+                    'message' => 'Email atau password salah'
+                ], 401);
+            }
+
+            $user = auth('api')->user();
+
+            // Dispatch job ke queue
+            SendAuthNotification::dispatch($user, 'login');
+
             return response()->json([
-                'status' => 'error',
-                'code' => 401,
-                'message' => 'Unauthorized'
-            ], 401);
+                'message' => 'Login berhasil',
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'user' => $user
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error dalam login: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Terjadi kesalahan dalam login',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        $user = auth('api')->user();
-        
-        // Kirim notifikasi login
-        SendAuthNotification::dispatch($user, 'login');
-
-        return response()->json([
-            'status' => 'success',
-            'code' => 200,
-            'message' => 'Login successful',
-            'token' => $token
-        ]);
     }
 
     public function profile()
@@ -114,17 +121,13 @@ class AuthController extends Controller
 
         if (!$user) {
             return response()->json([
-                'status' => 'error',
-                'code' => 404,
-                'message' => 'User not found'
+                'message' => 'User tidak ditemukan'
             ], 404);
         }
 
         return response()->json([
-            'status' => 'success',
-            'code' => 200,
-            'message' => 'User profile fetched',
-            'data' => $user
+            'message' => 'Data profil berhasil diambil',
+            'user' => $user
         ]);
     }
 
@@ -134,9 +137,7 @@ class AuthController extends Controller
 
         if (!$user) {
             return response()->json([
-                'status' => 'error',
-                'code' => 404,
-                'message' => 'User not found'
+                'message' => 'User tidak ditemukan'
             ], 404);
         }
 
@@ -145,14 +146,11 @@ class AuthController extends Controller
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
         ]);
 
-        /** @var \App\Models\User $user */
-        $user->update($data);
+        User::where('id', $user->id)->update($data);
 
         return response()->json([
-            'status' => 'success',
-            'code' => 200,
-            'message' => 'Profile updated successfully',
-            'data' => $user
+            'message' => 'Profil berhasil diperbarui',
+            'user' => $user
         ]);
     }
 }
