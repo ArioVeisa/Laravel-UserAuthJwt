@@ -35,8 +35,8 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => 'Registrasi berhasil',
-                'user' => $user,
-                'token' => $token
+                    'user' => $user,
+                    'token' => $token
             ], 201);
         } catch (\Exception $e) {
             Log::error('Error dalam registrasi: ' . $e->getMessage());
@@ -87,20 +87,20 @@ class AuthController extends Controller
                 'password' => 'required|string',
             ]);
 
-            $credentials = $request->only('email', 'password');
+        $credentials = $request->only('email', 'password');
 
-            if (!$token = auth('api')->attempt($credentials)) {
-                return response()->json([
+        if (!$token = auth('api')->attempt($credentials)) {
+            return response()->json([
                     'message' => 'Email atau password salah'
-                ], 401);
-            }
+            ], 401);
+        }
 
             $user = auth('api')->user();
 
             // Dispatch job ke queue
             SendAuthNotification::dispatch($user, 'login');
 
-            return response()->json([
+        return response()->json([
                 'message' => 'Login berhasil',
                 'token' => $token,
                 'token_type' => 'Bearer',

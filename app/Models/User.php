@@ -23,10 +23,10 @@ class User extends Authenticatable implements JWTSubject
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-    ];
-
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    
     // Mendapatkan identifier untuk JWT
     public function getJWTIdentifier()
     {
